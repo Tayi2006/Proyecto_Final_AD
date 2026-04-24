@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipeline · Proyecto Final</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --grid: rgba(255,255,255,0.03);
+    --api: #00f5c4;
+    --etl: #ff6b35;
+    --mongo: #47d16c;
+    --dataset: #a78bfa;
+    --modelo: #38bdf8;
+    --app: #f59e0b;
+    --line: rgba(255,255,255,0.12);
+    --glow: 0 0 30px currentColor;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: #fff;
+    font-family: 'Space Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* Animated grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Floating orbs */
+  .orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.15;
+    pointer-events: none;
+    z-index: 0;
+    animation: float 8s ease-in-out infinite;
+  }
+  .orb1 { width: 400px; height: 400px; background: var(--api); top: -100px; left: -100px; animation-delay: 0s; }
+  .orb2 { width: 300px; height: 300px; background: var(--modelo); bottom: -50px; right: -50px; animation-delay: 3s; }
+  .orb3 { width: 200px; height: 200px; background: var(--dataset); top: 50%; left: 50%; animation-delay: 5s; }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px) scale(1); }
+    50% { transform: translateY(-30px) scale(1.05); }
+  }
+
+  .wrapper {
+    position: relative;
+    z-index: 1;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 20px 60px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 60px;
+    animation: fadeDown 0.8s ease both;
+  }
+
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: var(--api);
+    text-transform: uppercase;
+    border: 1px solid var(--api);
+    padding: 4px 12px;
+    margin-bottom: 16px;
+    opacity: 0.8;
+  }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(28px, 5vw, 52px);
+    font-weight: 800;
+    letter-spacing: -1px;
+    line-height: 1.1;
+  }
+
+  h1 span {
+    background: linear-gradient(135deg, var(--api), var(--modelo));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .subtitle {
+    margin-top: 12px;
+    color: rgba(255,255,255,0.4);
+    font-size: 13px;
+    letter-spacing: 1px;
+  }
+
+  /* Pipeline container */
+  .pipeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    align-items: center;
+  }
+
+  /* Node card */
+  .node {
+    width: 100%;
+    max-width: 680px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 28px 32px;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    animation: fadeUp 0.6s ease both;
+    overflow: hidden;
+  }
+
+  .node::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 16px;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .node:hover {
+    transform: translateY(-4px) scale(1.01);
+    border-color: rgba(255,255,255,0.2);
+  }
+
+  .node.active {
+    transform: translateY(-6px) scale(1.02);
+  }
+
+  /* Color themes per node */
+  .node[data-color="api"] { --c: var(--api); }
+  .node[data-color="etl"] { --c: var(--etl); }
+  .node[data-color="mongo"] { --c: var(--mongo); }
+  .node[data-color="dataset"] { --c: var(--dataset); }
+  .node[data-color="modelo"] { --c: var(--modelo); }
+  .node[data-color="app"] { --c: var(--app); }
+
+  .node:hover, .node.active {
+    border-color: var(--c);
+    box-shadow: 0 0 40px -10px var(--c), inset 0 0 60px -30px var(--c);
+  }
+
+  .node-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .node-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: var(--c);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+    box-shadow: 0 0 20px var(--c);
+    transition: transform 0.3s;
+  }
+
+  .node:hover .node-icon, .node.active .node-icon {
+    transform: rotate(-5deg) scale(1.1);
+  }
+
+  .node-title-block { flex: 1; }
+
+  .node-step {
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--c);
+    text-transform: uppercase;
+    opacity: 0.8;
+  }
+
+  .node-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+
+  .node-badge {
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.5);
+    white-space: nowrap;
+  }
+
+  .node-expand {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    display: none;
+    animation: expandIn 0.3s ease both;
+  }
+
+  .node.active .node-expand {
+    display: block;
+  }
+
+  @keyframes expandIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .node-desc {
+    font-size: 13px;
+    line-height: 1.7;
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 16px;
+  }
+
+  .node-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .tech-tag {
+    font-size: 11px;
+    padding: 4px 12px;
+    border-radius: 6px;
+    background: var(--c);
+    color: #000;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+
+  .node-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 16px;
+  }
+
+  .metric {
+    background: rgba(255,255,255,0.04);
+    border-radius: 10px;
+    padding: 12px;
+    text-align: center;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .metric-val {
+    font-family: 'Syne', sans-serif;
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--c);
+  }
+
+  .metric-lbl {
+    font-size: 10px;
+    color: rgba(255,255,255,0.4);
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  /* Arrow connector */
+  .arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    margin: 4px 0;
+    position: relative;
+    z-index: 1;
+  }
+
+  .arrow-line {
+    width: 2px;
+    height: 32px;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.15), rgba(255,255,255,0.05));
+    position: relative;
+    overflow: hidden;
+  }
+
+  .arrow-line::after {
+    content: '';
+    position: absolute;
+    top: -100%;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to bottom, transparent, var(--arrow-c, #fff));
+    animation: flowDown 2s linear infinite;
+  }
+
+  @keyframes flowDown {
+    0% { top: -100%; opacity: 1; }
+    100% { top: 100%; opacity: 0.3; }
+  }
+
+  .arrow-head {
+    width: 0;
+    height: 0;
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-top: 10px solid rgba(255,255,255,0.2);
+  }
+
+  .arrow-label {
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: rgba(255,255,255,0.2);
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  /* Progress bar at top */
+  .progress-bar {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 40px;
+    flex-wrap: wrap;
+  }
+
+  .progress-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.1);
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+  }
+
+  .progress-dot.active-dot {
+    background: var(--dc);
+    box-shadow: 0 0 10px var(--dc);
+    transform: scale(1.5);
+  }
+
+  /* Animations */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .node:nth-child(1) { animation-delay: 0.1s; }
+  .node:nth-child(1) ~ .arrow + .node { animation-delay: 0.2s; }
+
+  /* Footer */
+  footer {
+    text-align: center;
+    margin-top: 60px;
+    font-size: 11px;
+    color: rgba(255,255,255,0.15);
+    letter-spacing: 2px;
+  }
+
+  /* Pulse on load for first node */
+  @keyframes pulse-once {
+    0%, 100% { box-shadow: 0 0 0 0 transparent; }
+    50% { box-shadow: 0 0 40px -5px var(--c); }
+  }
+</style>
+</head>
+<body>
+
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+<div class="orb orb3"></div>
+
+<div class="wrapper">
+
+  <header>
+    <div class="tag">Proyecto Final · Diagrama</div>
+    <h1>Arquitectura del<br><span>Proyecto Final</span></h1>
+    <p class="subtitle">Haga clic en cada etapa para explorar los detalles</p>
+  </header>
+
+  <div class="progress-bar" id="progressBar"></div>
+
+  <div class="pipeline" id="pipeline">
+
+    <!-- API -->
+    <div class="node" data-color="api" data-id="0" onclick="toggleNode(this)">
+      <div class="node-header">
+        <div class="node-icon">🌐</div>
+        <div class="node-title-block">
+          <div class="node-step">Paso 01</div>
+          <div class="node-title">API</div>
+        </div>
+        <div class="node-badge">Fuente de datos</div>
+      </div>
+      <div class="node-expand">
+        <p class="node-desc">Consumo de APIs externas para ingesta de datos crudos. Se realizan peticiones HTTP (REST/GraphQL) con autenticación mediante API keys o tokens OAuth. Se maneja paginación, rate limiting y retry logic para garantizar disponibilidad.</p>
+        <div class="node-tags">
+          <span class="tech-tag">REST</span>
+          <span class="tech-tag">JSON</span>
+          <span class="tech-tag">Requests</span>
+          <span class="tech-tag">OAuth 2.0</span>
+          <span class="tech-tag">Pagination</span>
+        </div>
+        <div class="node-metrics">
+          <div class="metric"><div class="metric-val">HTTP</div><div class="metric-lbl">Protocolo</div></div>
+          <div class="metric"><div class="metric-val">GET/POST</div><div class="metric-lbl">Métodos</div></div>
+          <div class="metric"><div class="metric-val">JSON</div><div class="metric-lbl">Formato</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow" style="--arrow-c: var(--api)">
+      <div class="arrow-line"></div>
+      <div class="arrow-head"></div>
+      <div class="arrow-label">Datos crudos</div>
+    </div>
+
+    <!-- ETL -->
+    <div class="node" data-color="etl" data-id="1" onclick="toggleNode(this)">
+      <div class="node-header">
+        <div class="node-icon">⚙️</div>
+        <div class="node-title-block">
+          <div class="node-step">Paso 02</div>
+          <div class="node-title">ETL</div>
+        </div>
+        <div class="node-badge">Transformación</div>
+      </div>
+      <div class="node-expand">
+        <p class="node-desc">Extract-Transform-Load. Los datos son extraídos, limpiados y normalizados. Se aplican reglas de validación, manejo de nulos, conversión de tipos y enriquecimiento de datos. El proceso puede ser batch o streaming según el volumen.</p>
+        <div class="node-tags">
+          <span class="tech-tag">Pandas</span>
+          <span class="tech-tag">Airflow</span>
+          <span class="tech-tag">PySpark</span>
+          <span class="tech-tag">Limpieza</span>
+          <span class="tech-tag">Validación</span>
+        </div>
+        <div class="node-metrics">
+          <div class="metric"><div class="metric-val">Extract</div><div class="metric-lbl">Extracción</div></div>
+          <div class="metric"><div class="metric-val">Transform</div><div class="metric-lbl">Limpieza</div></div>
+          <div class="metric"><div class="metric-val">Load</div><div class="metric-lbl">Carga</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow" style="--arrow-c: var(--etl)">
+      <div class="arrow-line"></div>
+      <div class="arrow-head"></div>
+      <div class="arrow-label">Datos limpios</div>
+    </div>
+
+    <!-- MongoDB -->
+    <div class="node" data-color="mongo" data-id="2" onclick="toggleNode(this)">
+      <div class="node-header">
+        <div class="node-icon">🍃</div>
+        <div class="node-title-block">
+          <div class="node-step">Paso 03</div>
+          <div class="node-title">MongoDB</div>
+        </div>
+        <div class="node-badge">Almacenamiento</div>
+      </div>
+      <div class="node-expand">
+        <p class="node-desc">Base de datos NoSQL orientada a documentos. Almacena los datos procesados en colecciones con esquema flexible. Permite consultas complejas con agregaciones, índices y replicación. Ideal para datos semiestructurados y de alta variabilidad.</p>
+        <div class="node-tags">
+          <span class="tech-tag">NoSQL</span>
+          <span class="tech-tag">PyMongo</span>
+          <span class="tech-tag">Atlas</span>
+          <span class="tech-tag">Aggregation</span>
+          <span class="tech-tag">Indexes</span>
+        </div>
+        <div class="node-metrics">
+          <div class="metric"><div class="metric-val">BSON</div><div class="metric-lbl">Formato</div></div>
+          <div class="metric"><div class="metric-val">NoSQL</div><div class="metric-lbl">Tipo</div></div>
+          <div class="metric"><div class="metric-val">Atlas</div><div class="metric-lbl">Cloud</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow" style="--arrow-c: var(--mongo)">
+      <div class="arrow-line"></div>
+      <div class="arrow-head"></div>
+      <div class="arrow-label">Query / Export</div>
+    </div>
+
+    <!-- Dataset -->
+    <div class="node" data-color="dataset" data-id="3" onclick="toggleNode(this)">
+      <div class="node-header">
+        <div class="node-icon">📊</div>
+        <div class="node-title-block">
+          <div class="node-step">Paso 04</div>
+          <div class="node-title">Dataset</div>
+        </div>
+        <div class="node-badge">Preparación ML</div>
+      </div>
+      <div class="node-expand">
+        <p class="node-desc">Construcción del dataset para entrenamiento. Se aplica feature engineering, encoding de variables categóricas, normalización/estandarización, balanceo de clases y división en train/validation/test. Se documenta con un data card.</p>
+        <div class="node-tags">
+          <span class="tech-tag">Scikit-learn</span>
+          <span class="tech-tag">Feature Eng.</span>
+          <span class="tech-tag">Train/Test</span>
+          <span class="tech-tag">EDA</span>
+          <span class="tech-tag">Numpy</span>
+        </div>
+        <div class="node-metrics">
+          <div class="metric"><div class="metric-val">70%</div><div class="metric-lbl">Train</div></div>
+          <div class="metric"><div class="metric-val">15%</div><div class="metric-lbl">Val</div></div>
+          <div class="metric"><div class="metric-val">15%</div><div class="metric-lbl">Test</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow" style="--arrow-c: var(--dataset)">
+      <div class="arrow-line"></div>
+      <div class="arrow-head"></div>
+      <div class="arrow-label">Entrenamiento</div>
+    </div>
+
+    <!-- Modelo -->
+    <div class="node" data-color="modelo" data-id="4" onclick="toggleNode(this)">
+      <div class="node-header">
+        <div class="node-icon">🤖</div>
+        <div class="node-title-block">
+          <div class="node-step">Paso 05</div>
+          <div class="node-title">Modelo</div>
+        </div>
+        <div class="node-badge">Machine Learning</div>
+      </div>
+      <div class="node-expand">
+        <p class="node-desc">Selección, entrenamiento y evaluación del modelo de ML. Se comparan múltiples algoritmos con cross-validation, se optimizan hiperparámetros con Grid/Random Search y se registran experimentos. El modelo final se serializa y versiona.</p>
+        <div class="node-tags">
+          <span class="tech-tag">Scikit-learn</span>
+          <span class="tech-tag">XGBoost</span>
+          <span class="tech-tag">MLflow</span>
+          <span class="tech-tag">Pickle</span>
+          <span class="tech-tag">Métricas</span>
+        </div>
+        <div class="node-metrics">
+          <div class="metric"><div class="metric-val">Train</div><div class="metric-lbl">Fase</div></div>
+          <div class="metric"><div class="metric-val">Eval</div><div class="metric-lbl">Validación</div></div>
+          <div class="metric"><div class="metric-val">.pkl</div><div class="metric-lbl">Serialización</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow" style="--arrow-c: var(--modelo)">
+      <div class="arrow-line"></div>
+      <div class="arrow-head"></div>
+      <div class="arrow-label">Inferencia</div>
+    </div>
+
+    <!-- App -->
+    <div class="node" data-color="app" data-id="5" onclick="toggleNode(this)">
+      <div class="node-header">
+        <div class="node-icon">🚀</div>
+        <div class="node-title-block">
+          <div class="node-step">Paso 06</div>
+          <div class="node-title">App</div>
+        </div>
+        <div class="node-badge">Producción</div>
+      </div>
+      <div class="node-expand">
+        <p class="node-desc">Despliegue del modelo como aplicación web o API. Se construye una interfaz para que usuarios finales interactúen con las predicciones. Se implementan endpoints REST, monitoreo de drift y logging. El deploy puede ser en cloud o contenedor.</p>
+        <div class="node-tags">
+          <span class="tech-tag">Streamlit</span>
+          <span class="tech-tag">FastAPI</span>
+          <span class="tech-tag">Flask</span>
+          <span class="tech-tag">Docker</span>
+          <span class="tech-tag">Deploy</span>
+        </div>
+        <div class="node-metrics">
+          <div class="metric"><div class="metric-val">REST</div><div class="metric-lbl">API</div></div>
+          <div class="metric"><div class="metric-val">UI</div><div class="metric-lbl">Interfaz</div></div>
+          <div class="metric"><div class="metric-val">Cloud</div><div class="metric-lbl">Deploy</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    Keylor Mora | Javier Hidalgo | Administración de datos
+  </footer>
+
+</div>
+
+<script>
+  const colors = {
+    0: '#00f5c4',
+    1: '#ff6b35',
+    2: '#47d16c',
+    3: '#a78bfa',
+    4: '#38bdf8',
+    5: '#f59e0b'
+  };
+
+  let activeNode = null;
+
+  // Build progress dots
+  const bar = document.getElementById('progressBar');
+  for (let i = 0; i < 6; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'progress-dot';
+    dot.style.setProperty('--dc', colors[i]);
+    dot.setAttribute('data-dot', i);
+    dot.onclick = () => {
+      const nodes = document.querySelectorAll('.node');
+      toggleNode(nodes[i]);
+      nodes[i].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+    bar.appendChild(dot);
+  }
+
+  function toggleNode(node) {
+    const id = parseInt(node.getAttribute('data-id'));
+    const dots = document.querySelectorAll('.progress-dot');
+
+    if (activeNode && activeNode !== node) {
+      activeNode.classList.remove('active');
+    }
+
+    if (node.classList.contains('active')) {
+      node.classList.remove('active');
+      dots[id].classList.remove('active-dot');
+      activeNode = null;
+    } else {
+      node.classList.add('active');
+      dots[id].classList.add('active-dot');
+      if (activeNode) {
+        const oldId = parseInt(activeNode.getAttribute('data-id'));
+        dots[oldId].classList.remove('active-dot');
+      }
+      activeNode = node;
+    }
+  }
+
+  // Stagger animation on load
+  const nodes = document.querySelectorAll('.node');
+  nodes.forEach((n, i) => {
+    n.style.animationDelay = `${i * 0.1 + 0.2}s`;
+  });
+
+  const arrows = document.querySelectorAll('.arrow');
+  arrows.forEach((a, i) => {
+    const c = colors[i];
+    a.querySelector('.arrow-line').style.setProperty('--arrow-c', c);
+    a.querySelector('.arrow-head').style.borderTopColor = c + '50';
+    a.querySelector('.arrow-label').style.color = c + '60';
+  });
+</script>
+
+</body>
+</html>
